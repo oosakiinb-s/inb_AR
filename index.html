@@ -5,20 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AR 商品確認</title>
+  <title>AR サイズ確認</title>
 
-  <!--
-  ============================================================
-    ライブラリ構成（iOSを含む最大互換性）
-    - A-Frame 1.5.0
-    - AR.js  : マーカーレス / Location-based ではなく
-               「カメラ映像をそのまま背景にして A-Frame シーンを
-                重ね、DeviceOrientation でビュー回転」方式を採用。
-               iOS Safari は WebXR 非対応のため、この方式が最も
-               シンプルに動作する。
-    ※ AR.js の location/marker は不要なため読み込まない。
-  ============================================================
-  -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
   <style>
@@ -403,16 +391,14 @@
 </head>
 <body>
 
-<!-- フラッシュ演出 -->
 <div id="flash"></div>
 
-<!-- ========== 起動画面 ========== -->
 <div id="start-screen">
   <div class="start-icon">📦</div>
-  <div class="start-title">AR 商品イメージ</div>
+  <div class="start-title">AR サイズ確認</div>
   <div class="start-desc">
     実物大の商品を空間に配置して<br>
-    設置イメージを確認できます
+    サイズ感・設置イメージを確認できます
   </div>
   <div class="start-notes">
     ✅ &nbsp;カメラ映像に商品画像を重ねて表示<br>
@@ -424,10 +410,8 @@
   <button id="btn-start">カメラを起動する</button>
 </div>
 
-<!-- ========== カメラ映像（背景） ========== -->
 <video id="cam-bg" autoplay playsinline muted></video>
 
-<!-- ========== A-Frame シーン ========== -->
 <a-scene
   id="ar-scene"
   embedded
@@ -436,42 +420,44 @@
   background="transparent: true"
   style="display:none"
 >
-  <!-- 商品プレーン A（a-plane + Three.js テクスチャ直接ロード） -->
-  <a-plane
-    id="entity-A"
-    visible="false"
-    width="1" height="1"
-    rotation="0 0 0"
-    material="shader: flat; transparent: true; alphaTest: 0.05; side: double; npot: true;"
-  ></a-plane>
+  <a-assets id="ar-assets" timeout="15000"></a-assets>
 
-  <!-- 商品プレーン B -->
-  <a-plane
-    id="entity-B"
-    visible="false"
-    width="1" height="1"
-    rotation="0 0 0"
-    material="shader: flat; transparent: true; alphaTest: 0.05; side: double; npot: true;"
-  ></a-plane>
+  <a-light type="ambient" intensity="1.2"></a-light>
+  <a-light type="directional" intensity="0.6" position="0 3 2"></a-light>
 
-  <!-- カメラ -->
+  <a-entity id="entity-A" visible="false">
+    <a-image
+      id="img-A"
+      src=""
+      width="1" height="1"
+      material="transparent: true; alphaTest: 0.01; side: double;"
+      rotation="0 0 0"
+    ></a-image>
+  </a-entity>
+
+  <a-entity id="entity-B" visible="false">
+    <a-image
+      id="img-B"
+      src=""
+      width="1" height="1"
+      material="transparent: true; alphaTest: 0.01; side: double;"
+      rotation="0 0 0"
+    ></a-image>
+  </a-entity>
+
   <a-entity id="ar-camera" camera look-controls="magicWindowTrackingEnabled: true;" position="0 1.6 0"></a-entity>
 </a-scene>
 
-<!-- ========== タップ領域 ========== -->
 <div id="tap-overlay"></div>
 
-<!-- ========== レティクル ========== -->
 <div id="reticle">
   <div class="reticle-ring"></div>
   <div class="reticle-label" id="reticle-label">商品Aをタップで配置</div>
 </div>
 
-<!-- ========== トップバー ========== -->
 <div id="top-bar" style="display:none">
   <div id="app-logo">AR<span>サイズ確認</span></div>
   <button id="btn-capture">
-    <!-- camera icon -->
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
          stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -481,14 +467,11 @@
   </button>
 </div>
 
-<!-- ========== サイズバッジ ========== -->
 <div class="size-badge-a" id="badge-a">A：−</div>
 <div class="size-badge-b" id="badge-b">B：−</div>
 
-<!-- ========== ボトムパネル ========== -->
 <div id="bottom-panel" style="display:none">
 
-  <!-- スロットタブ -->
   <div id="slot-tabs">
     <div class="slot-tab active" data-slot="A" id="tab-A" onclick="switchSlot('A')">
       <div class="slot-icon">A</div>
@@ -508,7 +491,6 @@
     </div>
   </div>
 
-  <!-- セレクター -->
   <div id="selectors">
     <div class="sel-wrap">
       <label>機種名</label>
@@ -524,7 +506,6 @@
     </div>
   </div>
 
-  <!-- アクションボタン -->
   <div id="action-row">
     <button class="act-btn place"      onclick="placeItem()">📌 配置</button>
     <button class="act-btn remove-one" onclick="removeSlot()">🗑 削除</button>
@@ -532,13 +513,9 @@
   </div>
 </div>
 
-<!-- ========== トースト ========== -->
 <div id="toast"></div>
 
 
-<!-- ================================================================
-     JavaScript
-================================================================ -->
 <script>
 'use strict';
 
@@ -691,85 +668,56 @@ function updateRowFromSelectors() {
 
 /* ─────────────────────────────────────────────
    ⑤ A-Frame エンティティ操作
-   【方針】Three.js TextureLoader で直接ロード。
-   A-Frame の a-assets / material 属性経由では
-   GitHub Pages 上で読み込めないケースがあるため、
-   Three.js レイヤーに直接テクスチャを適用する。
 ─────────────────────────────────────────────── */
 function getEntity(slot) {
   return document.getElementById(`entity-${slot}`);
 }
-
-// テクスチャキャッシュ（同じ画像を何度もロードしない）
-const _texCache = {};
+function getImgEl(slot) {
+  return document.getElementById(`img-${slot}`);
+}
 
 function applyEntityForSlot(slot) {
-  const s   = state[slot];
-  const row = s.row;
+  const s    = state[slot];
+  const row  = s.row;
   if (!row) return;
 
   const entity = getEntity(slot);
+  const imgEl  = getImgEl(slot);
+
+  // 実寸（m）
   const wM = mm2m(row.w);
   const hM = mm2m(row.h);
-  const imgPath = `AR_image/${row.file}`;
 
-  // サイズだけ先に設定
-  entity.setAttribute('width',  wM);
-  entity.setAttribute('height', hM);
-  entity.setAttribute('position', `${s.posX} ${hM / 2} ${s.posZ}`);
-  entity.setAttribute('visible', 'false'); // テクスチャ適用後に表示
+  // ─────────────────────────────────────────────────────────
+  // 【修正】GitHub Pages環境での絶対パス誤認を防ぐため、
+  // 明確に「 ./ 」から始まる相対パスへ変更しました。
+  // ─────────────────────────────────────────────────────────
+  const imgPath = `./AR_image/${row.file}`;
 
-  const applyTexture = (texture) => {
-    // Three.js メッシュに直接テクスチャを適用
-    const mesh = entity.getObject3D('mesh');
-    if (mesh && mesh.material) {
-      texture.needsUpdate = true;
-      mesh.material.map          = texture;
-      mesh.material.transparent  = true;
-      mesh.material.alphaTest    = 0.05;
-      mesh.material.side         = THREE.DoubleSide;
-      mesh.material.needsUpdate  = true;
-    }
+  // まず非表示にしてテクスチャ切替のちらつきを抑制
+  entity.setAttribute('visible', 'false');
+
+  imgEl.setAttribute('width',  wM);
+  imgEl.setAttribute('height', hM);
+
+  // material で直接URLを指定（a-assets を経由しない）
+  imgEl.setAttribute('material',
+    `src: url(${imgPath}); transparent: true; alphaTest: 0.01; side: double; shader: flat;`
+  );
+
+  // テクスチャ読み込み完了後に表示（即時フォールバック付き）
+  const showEntity = () => {
+    entity.setAttribute('position', `${s.posX} ${hM / 2} ${s.posZ}`);
     entity.setAttribute('visible', 'true');
     updateBadge(slot, row);
   };
 
-  const loadTexture = () => {
-    if (_texCache[imgPath]) {
-      applyTexture(_texCache[imgPath]);
-      return;
-    }
-    const loader = new THREE.TextureLoader();
-    loader.crossOrigin = 'anonymous';
-    loader.load(
-      imgPath,
-      (texture) => {
-        _texCache[imgPath] = texture;
-        applyTexture(texture);
-      },
-      undefined,
-      (err) => {
-        console.error('Texture load error:', imgPath, err);
-        // フォールバック：エラーでも表示だけはする
-        entity.setAttribute('visible', 'true');
-        updateBadge(slot, row);
-      }
-    );
-  };
-
-  // A-Frame のメッシュが生成済みかチェック
-  if (entity.getObject3D('mesh')) {
-    loadTexture();
-  } else {
-    // メッシュ生成を待つ
-    entity.addEventListener('object3dset', () => loadTexture(), { once: true });
-    // フォールバック（100ms後に強制実行）
-    setTimeout(() => {
-      if (!entity.getAttribute('visible') || entity.getAttribute('visible') === 'false') {
-        loadTexture();
-      }
-    }, 100);
-  }
+  // material-texture-loaded イベントを待つ（最大1.5秒でフォールバック）
+  const fallbackTimer = setTimeout(showEntity, 1500);
+  imgEl.addEventListener('materialtextureloaded', () => {
+    clearTimeout(fallbackTimer);
+    showEntity();
+  }, { once: true });
 }
 
 function updateBadge(slot, row) {
@@ -1069,7 +1017,8 @@ window.addEventListener('DOMContentLoaded', () => {
 ─────────────────────────────────────────────── */
 async function runImageDiagnostics() {
   const results = await Promise.all(MASTER.map(async row => {
-    const url = `AR_image/${row.file}`;
+    // 【修正】診断用のパスも明確な相対パスに変更
+    const url = `./AR_image/${row.file}`;
     try {
       const res = await fetch(url, { method: 'HEAD' });
       return { file: row.file, ok: res.ok, status: res.status };
@@ -1107,7 +1056,7 @@ async function runImageDiagnostics() {
             ${r.ok ? '✅' : '❌'}
           </span>
           <span style="color:${r.ok?'#aaa':'#ff8080'};word-break:break-all">
-            AR_image/${r.file}
+            ./AR_image/${r.file}
           </span>
           <span style="color:#666;margin-left:auto;flex-shrink:0">
             ${r.status}
@@ -1120,7 +1069,7 @@ async function runImageDiagnostics() {
                 border:1px solid rgba(255,100,100,0.3);
                 border-radius:10px;padding:14px;font-size:12px;line-height:1.8">
       <b style="color:#ff8080">❌ 画像が見つかりません。確認ポイント：</b><br>
-      1. <code>AR_image/</code> フォルダが <code>index.html</code> と同じ階層にあるか<br>
+      1. <code>./AR_image/</code> フォルダが <code>index.html</code> と同じ階層にあるか<br>
       2. ファイル名の大文字・小文字（GitHub は大文字小文字を区別します）<br>
       3. ファイルが Git に add・commit・push されているか<br>
       &nbsp;&nbsp;&nbsp;<code>git add AR_image/ && git commit -m "add images" && git push</code><br>
