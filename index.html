@@ -436,35 +436,25 @@
   background="transparent: true"
   style="display:none"
 >
-  <a-assets id="ar-assets" timeout="15000"></a-assets>
+  <!-- 商品プレーン A（a-plane + Three.js テクスチャ直接ロード） -->
+  <a-plane
+    id="entity-A"
+    visible="false"
+    width="1" height="1"
+    rotation="0 0 0"
+    material="shader: flat; transparent: true; alphaTest: 0.05; side: double; npot: true;"
+  ></a-plane>
 
-  <!-- 環境光（商品画像が見えやすい明るさ） -->
-  <a-light type="ambient" intensity="1.2"></a-light>
-  <a-light type="directional" intensity="0.6" position="0 3 2"></a-light>
+  <!-- 商品プレーン B -->
+  <a-plane
+    id="entity-B"
+    visible="false"
+    width="1" height="1"
+    rotation="0 0 0"
+    material="shader: flat; transparent: true; alphaTest: 0.05; side: double; npot: true;"
+  ></a-plane>
 
-  <!-- 商品エンティティ A -->
-  <a-entity id="entity-A" visible="false">
-    <a-image
-      id="img-A"
-      src=""
-      width="1" height="1"
-      material="transparent: true; alphaTest: 0.01; side: double;"
-      rotation="0 0 0"
-    ></a-image>
-  </a-entity>
-
-  <!-- 商品エンティティ B -->
-  <a-entity id="entity-B" visible="false">
-    <a-image
-      id="img-B"
-      src=""
-      width="1" height="1"
-      material="transparent: true; alphaTest: 0.01; side: double;"
-      rotation="0 0 0"
-    ></a-image>
-  </a-entity>
-
-  <!-- カメラ（DeviceOrientation で回転） -->
+  <!-- カメラ -->
   <a-entity id="ar-camera" camera look-controls="magicWindowTrackingEnabled: true;" position="0 1.6 0"></a-entity>
 </a-scene>
 
@@ -701,58 +691,85 @@ function updateRowFromSelectors() {
 
 /* ─────────────────────────────────────────────
    ⑤ A-Frame エンティティ操作
+   【方針】Three.js TextureLoader で直接ロード。
+   A-Frame の a-assets / material 属性経由では
+   GitHub Pages 上で読み込めないケースがあるため、
+   Three.js レイヤーに直接テクスチャを適用する。
 ─────────────────────────────────────────────── */
 function getEntity(slot) {
   return document.getElementById(`entity-${slot}`);
 }
-function getImgEl(slot) {
-  return document.getElementById(`img-${slot}`);
-}
+
+// テクスチャキャッシュ（同じ画像を何度もロードしない）
+const _texCache = {};
 
 function applyEntityForSlot(slot) {
-  const s    = state[slot];
-  const row  = s.row;
+  const s   = state[slot];
+  const row = s.row;
   if (!row) return;
 
   const entity = getEntity(slot);
-  const imgEl  = getImgEl(slot);
-
-  // 実寸（m）
   const wM = mm2m(row.w);
   const hM = mm2m(row.h);
-
-  // ─────────────────────────────────────────────────────────
-  // 【修正】a-assets の動的追加は A-Frame が再ロードを
-  //   認識しない場合があるため、src に直接 URL を渡す方式に変更。
-  //   material コンポーネントで src: url(...) を指定することで
-  //   A-Frame が毎回確実に画像を読み込む。
-  // ─────────────────────────────────────────────────────────
   const imgPath = `AR_image/${row.file}`;
 
-  // まず非表示にしてテクスチャ切替のちらつきを抑制
-  entity.setAttribute('visible', 'false');
+  // サイズだけ先に設定
+  entity.setAttribute('width',  wM);
+  entity.setAttribute('height', hM);
+  entity.setAttribute('position', `${s.posX} ${hM / 2} ${s.posZ}`);
+  entity.setAttribute('visible', 'false'); // テクスチャ適用後に表示
 
-  imgEl.setAttribute('width',  wM);
-  imgEl.setAttribute('height', hM);
-
-  // material で直接URLを指定（a-assets を経由しない）
-  imgEl.setAttribute('material',
-    `src: url(${imgPath}); transparent: true; alphaTest: 0.01; side: double; shader: flat;`
-  );
-
-  // テクスチャ読み込み完了後に表示（即時フォールバック付き）
-  const showEntity = () => {
-    entity.setAttribute('position', `${s.posX} ${hM / 2} ${s.posZ}`);
+  const applyTexture = (texture) => {
+    // Three.js メッシュに直接テクスチャを適用
+    const mesh = entity.getObject3D('mesh');
+    if (mesh && mesh.material) {
+      texture.needsUpdate = true;
+      mesh.material.map          = texture;
+      mesh.material.transparent  = true;
+      mesh.material.alphaTest    = 0.05;
+      mesh.material.side         = THREE.DoubleSide;
+      mesh.material.needsUpdate  = true;
+    }
     entity.setAttribute('visible', 'true');
     updateBadge(slot, row);
   };
 
-  // material-texture-loaded イベントを待つ（最大1.5秒でフォールバック）
-  const fallbackTimer = setTimeout(showEntity, 1500);
-  imgEl.addEventListener('materialtextureloaded', () => {
-    clearTimeout(fallbackTimer);
-    showEntity();
-  }, { once: true });
+  const loadTexture = () => {
+    if (_texCache[imgPath]) {
+      applyTexture(_texCache[imgPath]);
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+    loader.load(
+      imgPath,
+      (texture) => {
+        _texCache[imgPath] = texture;
+        applyTexture(texture);
+      },
+      undefined,
+      (err) => {
+        console.error('Texture load error:', imgPath, err);
+        // フォールバック：エラーでも表示だけはする
+        entity.setAttribute('visible', 'true');
+        updateBadge(slot, row);
+      }
+    );
+  };
+
+  // A-Frame のメッシュが生成済みかチェック
+  if (entity.getObject3D('mesh')) {
+    loadTexture();
+  } else {
+    // メッシュ生成を待つ
+    entity.addEventListener('object3dset', () => loadTexture(), { once: true });
+    // フォールバック（100ms後に強制実行）
+    setTimeout(() => {
+      if (!entity.getAttribute('visible') || entity.getAttribute('visible') === 'false') {
+        loadTexture();
+      }
+    }, 100);
+  }
 }
 
 function updateBadge(slot, row) {
